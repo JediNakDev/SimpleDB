@@ -21,7 +21,7 @@ public class Predicate implements Serializable {
          * convenience.
          * 
          * @param i
-         *            a valid integer Op index
+         *          a valid integer Op index
          */
         public static Op getOp(int i) {
             return values()[i];
@@ -46,48 +46,48 @@ public class Predicate implements Serializable {
         }
 
     }
-    
+
+    private int field;
+    private Op op;
+    private Field operand;
+
     /**
      * Constructor.
      * 
      * @param field
-     *            field number of passed in tuples to compare against.
+     *                field number of passed in tuples to compare against.
      * @param op
-     *            operation to use for comparison
+     *                operation to use for comparison
      * @param operand
-     *            field value to compare passed in tuples to
+     *                field value to compare passed in tuples to
      */
     public Predicate(int field, Op op, Field operand) {
-        // some code goes here
+        this.field = field;
+        this.op = op;
+        this.operand = operand;
     }
 
     /**
      * @return the field number
      */
-    public int getField()
-    {
-        // some code goes here
-        return -1;
+    public int getField() {
+        return field;
     }
 
     /**
      * @return the operator
      */
-    public Op getOp()
-    {
-        // some code goes here
-        return null;
+    public Op getOp() {
+        return op;
     }
-    
+
     /**
      * @return the operand
      */
-    public Field getOperand()
-    {
-        // some code goes here
-        return null;
+    public Field getOperand() {
+        return operand;
     }
-    
+
     /**
      * Compares the field number of t specified in the constructor to the
      * operand field specified in the constructor using the operator specific in
@@ -95,12 +95,12 @@ public class Predicate implements Serializable {
      * method.
      * 
      * @param t
-     *            The tuple to compare against
+     *          The tuple to compare against
      * @return true if the comparison is true, false otherwise.
      */
     public boolean filter(Tuple t) {
-        // some code goes here
-        return false;
+        Field fieldValue = t.getField(this.field);
+        return fieldValue.compare(this.op, this.operand);
     }
 
     /**
@@ -108,7 +108,6 @@ public class Predicate implements Serializable {
      * operand_string"
      */
     public String toString() {
-        // some code goes here
-        return "";
+        return "f = " + field + " op = " + op.toString() + " operand = " + operand.toString();
     }
 }

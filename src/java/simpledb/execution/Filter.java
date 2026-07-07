@@ -14,40 +14,44 @@ public class Filter extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    private Predicate predicate;
+    private OpIterator child;
+
     /**
      * Constructor accepts a predicate to apply and a child operator to read
      * tuples to filter from.
      * 
      * @param p
-     *            The predicate to filter tuples with
+     *              The predicate to filter tuples with
      * @param child
-     *            The child operator
+     *              The child operator
      */
     public Filter(Predicate p, OpIterator child) {
-        // some code goes here
+        this.predicate = p;
+        this.child = child;
     }
 
     public Predicate getPredicate() {
-        // some code goes here
-        return null;
+        return predicate;
     }
 
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return child.getTupleDesc();
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        super.open();
+        child.open();
     }
 
     public void close() {
-        // some code goes here
+        super.close();
+        child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        child.rewind();
     }
 
     /**
@@ -61,19 +65,23 @@ public class Filter extends Operator {
      */
     protected Tuple fetchNext() throws NoSuchElementException,
             TransactionAbortedException, DbException {
-        // some code goes here
+        while (child.hasNext()) {
+            Tuple tuple = child.next();
+            if (predicate.filter(tuple)) {
+                return tuple;
+            }
+        }
         return null;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        return new OpIterator[] { child };
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        this.child = children[0];
     }
 
 }
