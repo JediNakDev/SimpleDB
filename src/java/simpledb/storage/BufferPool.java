@@ -83,7 +83,7 @@ public class BufferPool {
         Page p = pages.get(pid);
         if (p == null) {
             if (pages.size() >= numPages)
-                throw new DbException("buffer pool full");
+                evictPage();
             DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
             p = file.readPage(pid);
             pages.put(pid, p);
@@ -189,9 +189,9 @@ public class BufferPool {
      * break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
-        // not necessary for lab1
-
+        for (PageId pid : pages.keySet()) {
+            flushPage(pid);
+        }
     }
 
     /**
@@ -204,8 +204,7 @@ public class BufferPool {
      * are removed from the cache so they can be reused safely
      */
     public synchronized void discardPage(PageId pid) {
-        // some code goes here
-        // not necessary for lab1
+        pages.remove(pid);
     }
 
     /**
@@ -214,8 +213,13 @@ public class BufferPool {
      * @param pid an ID indicating the page to flush
      */
     private synchronized void flushPage(PageId pid) throws IOException {
-        // some code goes here
-        // not necessary for lab1
+        Page p = pages.get(pid);
+        if (p == null)
+            return;
+        if (p.isDirty() != null) {
+            Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(p);
+            p.markDirty(false, null);
+        }
     }
 
     /**
@@ -231,8 +235,19 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        PageId victim = null;
+        for (PageId pid : pages.keySet()) {
+            victim = pid;
+            break;
+        }
+        if (victim == null)
+            throw new DbException("no page to evict");
+        try {
+            flushPage(victim);
+        } catch (IOException e) {
+            throw new DbException("failed to flush evicted page");
+        }
+        pages.remove(victim);
     }
 
 }
