@@ -108,18 +108,24 @@ public class HeapFile implements DbFile {
 
         for (int i = 0; i < numPages(); i++) {
             HeapPageId pid = new HeapPageId(getId(), i);
-            HeapPage page = (HeapPage) bp.getPage(tid, pid, Permissions.READ_WRITE);
+            boolean heldBefore = bp.holdsLock(tid, pid);
+            HeapPage page = (HeapPage) bp.getPage(tid, pid, Permissions.READ_ONLY);
             if (page.getNumEmptySlots() > 0) {
+                page = (HeapPage) bp.getPage(tid, pid, Permissions.READ_WRITE);
                 page.insertTuple(t);
                 modified.add(page);
                 return modified;
+            } else if (!heldBefore) {
+                bp.unsafeReleasePage(tid, pid);
             }
         }
 
-        // no free slot: append a new empty page to disk
-        HeapPageId newPid = new HeapPageId(getId(), numPages());
-        HeapPage newPage = new HeapPage(newPid, HeapPage.createEmptyPageData());
-        writePage(newPage);
+        HeapPageId newPid;
+        synchronized (this) {
+            newPid = new HeapPageId(getId(), numPages());
+            HeapPage newPage = new HeapPage(newPid, HeapPage.createEmptyPageData());
+            writePage(newPage);
+        }
         HeapPage page = (HeapPage) bp.getPage(tid, newPid, Permissions.READ_WRITE);
         page.insertTuple(t);
         modified.add(page);
