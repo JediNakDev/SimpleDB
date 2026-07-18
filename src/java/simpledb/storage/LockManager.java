@@ -4,6 +4,9 @@ import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -20,6 +23,7 @@ public class LockManager {
     private static final long RETRY_INTERVAL_MS = 10;
 
     private final Map<PageId, LockState> locks = new HashMap<>();
+    private final Map<TransactionId, PageId> waitingFor = new HashMap<>();
 
     /**
      * Acquire the requested lock on {@code pid} for {@code tid}, blocking until
@@ -33,13 +37,63 @@ public class LockManager {
     public void acquire(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException {
         boolean exclusive = perm == Permissions.READ_WRITE;
-        while (!tryAcquire(tid, pid, exclusive)) {
+        while (true) {
+            synchronized (this) {
+                if (tryAcquire(tid, pid, exclusive)) {
+                    waitingFor.remove(tid);
+                    return;
+                }
+                waitingFor.put(tid, pid);
+                if (hasDeadlock(tid)) {
+                    waitingFor.remove(tid);
+                    throw new TransactionAbortedException();
+                }
+            }
             try {
                 Thread.sleep(RETRY_INTERVAL_MS);
             } catch (InterruptedException e) {
+                synchronized (this) {
+                    waitingFor.remove(tid);
+                }
                 throw new TransactionAbortedException();
             }
         }
+    }
+
+    /**
+     * @return true if {@code start} is part of a cycle in the wait-for graph,
+     *         i.e. following "waits-for" edges from it leads back to itself.
+     */
+    private boolean hasDeadlock(TransactionId start) {
+        Set<TransactionId> visited = new HashSet<>();
+        Deque<TransactionId> frontier = new ArrayDeque<>(waitEdges(start));
+        while (!frontier.isEmpty()) {
+            TransactionId t = frontier.poll();
+            if (t.equals(start)) {
+                return true;
+            }
+            if (visited.add(t)) {
+                frontier.addAll(waitEdges(t));
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The transactions {@code t} is currently waiting for (holders of its page).
+     */
+    private Set<TransactionId> waitEdges(TransactionId t) {
+        PageId pid = waitingFor.get(t);
+        if (pid == null) {
+            return Collections.emptySet();
+        }
+        LockState state = locks.get(pid);
+        if (state == null) {
+            return Collections.emptySet();
+        }
+        Set<TransactionId> holders = new HashSet<>(state.holders);
+        holders.remove(t);
+        return holders;
     }
 
     /**
