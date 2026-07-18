@@ -8,6 +8,7 @@ import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -115,8 +116,7 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
@@ -131,9 +131,22 @@ public class BufferPool {
      * @param tid    the ID of the transaction requesting the unlock
      * @param commit a flag indicating whether we should commit or abort
      */
-    public void transactionComplete(TransactionId tid, boolean commit) {
-        // some code goes here
-        // not necessary for lab1|lab2
+    public synchronized void transactionComplete(TransactionId tid, boolean commit) {
+        if (commit) {
+            try {
+                flushPages(tid);
+            } catch (IOException e) {
+                throw new RuntimeException("failed to flush pages on commit", e);
+            }
+        } else {
+            for (PageId pid : new ArrayList<>(pages.keySet())) {
+                Page p = pages.get(pid);
+                if (p != null && tid.equals(p.isDirty())) {
+                    discardPage(pid);
+                }
+            }
+        }
+        lockManager.releaseAll(tid);
     }
 
     /**
@@ -228,8 +241,12 @@ public class BufferPool {
      * Write all pages of the specified transaction to disk.
      */
     public synchronized void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        for (PageId pid : pages.keySet()) {
+            Page p = pages.get(pid);
+            if (p != null && tid.equals(p.isDirty())) {
+                flushPage(pid);
+            }
+        }
     }
 
     /**

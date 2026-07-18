@@ -6,6 +6,7 @@ import simpledb.transaction.TransactionId;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -101,5 +102,19 @@ public class LockManager {
     public synchronized boolean holdsLock(TransactionId tid, PageId pid) {
         LockState state = locks.get(pid);
         return state != null && state.holders.contains(tid);
+    }
+
+    /**
+     * Release every lock held by {@code tid}.
+     */
+    public synchronized void releaseAll(TransactionId tid) {
+        Iterator<Map.Entry<PageId, LockState>> it = locks.entrySet().iterator();
+        while (it.hasNext()) {
+            LockState state = it.next().getValue();
+            if (state.holders.remove(tid) && state.holders.isEmpty()) {
+                state.exclusive = false;
+                it.remove();
+            }
+        }
     }
 }
