@@ -237,19 +237,13 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
-        PageId victim = null;
         for (PageId pid : pages.keySet()) {
-            victim = pid;
-            break;
+            if (pages.get(pid).isDirty() == null) {
+                pages.remove(pid);
+                return;
+            }
         }
-        if (victim == null)
-            throw new DbException("no page to evict");
-        try {
-            flushPage(victim);
-        } catch (IOException e) {
-            throw new DbException("failed to flush evicted page");
-        }
-        pages.remove(victim);
+        throw new DbException("all pages are dirty; cannot evict under NO STEAL");
     }
 
 }
