@@ -38,6 +38,7 @@ public class BufferPool {
 
     private int numPages = DEFAULT_PAGES;
     private final Map<PageId, Page> pages;
+    private final LockManager lockManager;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -47,6 +48,7 @@ public class BufferPool {
     public BufferPool(int numPages) {
         this.numPages = numPages;
         this.pages = new ConcurrentHashMap<>();
+        this.lockManager = new LockManager();
     }
 
     public static int getPageSize() {
@@ -80,15 +82,18 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
-        Page p = pages.get(pid);
-        if (p == null) {
-            if (pages.size() >= numPages)
-                evictPage();
-            DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
-            p = file.readPage(pid);
-            pages.put(pid, p);
+        lockManager.acquire(tid, pid, perm);
+        synchronized (this) {
+            Page p = pages.get(pid);
+            if (p == null) {
+                if (pages.size() >= numPages)
+                    evictPage();
+                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                p = file.readPage(pid);
+                pages.put(pid, p);
+            }
+            return p;
         }
-        return p;
     }
 
     /**
@@ -101,8 +106,7 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        lockManager.release(tid, pid);
     }
 
     /**
@@ -117,9 +121,7 @@ public class BufferPool {
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
-        // not necessary for lab1|lab2
-        return false;
+        return lockManager.holdsLock(tid, p);
     }
 
     /**
