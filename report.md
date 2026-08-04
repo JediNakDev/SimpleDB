@@ -81,9 +81,11 @@ All exercises are implemented and all tests named in the lab text pass:
 `BTreeFileDeleteTest` unit (7/7) and system (6/6);
 `BTreeNextKeyLockingTest` (2/2), `BTreeDeadlockTest` (1/1) and `BTreeTest` (1/1).
 
-Three failures remain in the wider suite, all of which predate this lab and were confirmed against an unmodified checkout:
+Failures that remain in the wider suite all predate this lab and were confirmed against an unmodified checkout.
+`IntHistogram` was unimplemented and has been filled in, so `IntHistogramTest` now passes (8/8).
+Still outstanding, and belonging to other labs rather than to this one:
 
-* `IntHistogramTest` (8/8), and `JoinOptimizerTest` (5/5) and `TableStatsTest` (3/3) which depend on it. `IntHistogram` is an unimplemented lab 3 optimizer exercise.
+* `TableStatsTest` (3/3) and `JoinOptimizerTest` (5/5). `TableStats` and `JoinOptimizer` are still stubs; these are lab 3 query-optimizer exercises.
 * `LogTest` (8 errors), which covers log-based recovery from lab 6.
 
 One structural caveat is inherent rather than a defect.
