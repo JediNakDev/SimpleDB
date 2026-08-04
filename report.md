@@ -81,12 +81,14 @@ All exercises are implemented and all tests named in the lab text pass:
 `BTreeFileDeleteTest` unit (7/7) and system (6/6);
 `BTreeNextKeyLockingTest` (2/2), `BTreeDeadlockTest` (1/1) and `BTreeTest` (1/1).
 
-Failures that remain in the wider suite all predate this lab and were confirmed against an unmodified checkout.
-`IntHistogram` was unimplemented and has been filled in, so `IntHistogramTest` now passes (8/8).
-Still outstanding, and belonging to other labs rather than to this one:
+The wider suite is also green.
+Several exercises from other labs were unimplemented in the starting code and have been filled in so that `ant test` and `ant systemtest` both pass end to end:
 
-* `TableStatsTest` (3/3) and `JoinOptimizerTest` (5/5). `TableStats` and `JoinOptimizer` are still stubs; these are lab 3 query-optimizer exercises.
-* `LogTest` (8 errors), which covers log-based recovery from lab 6.
+* `IntHistogram`, `TableStats` and `JoinOptimizer`, the lab 3 query-optimizer exercises. The histogram computes its bucket range in `long` arithmetic, since a column spanning most of the integer range overflows the obvious `max - min + 1` and yields a negative bucket count. Join ordering is the usual Selinger dynamic program over subsets.
+* `LogFile.rollback()` and `LogFile.recover()`, plus the write-ahead logging and `setBeforeImage()` calls in `BufferPool` that lab 6 requires. Recovery decides each update record's fate as it meets it, taking the after-image for committed transactions and the before-image otherwise, because committed and aborted transactions interleave on the same page and deferring all the undos to the end would roll back commits that came after them.
+
+One consequence worth flagging: logging a full before- and after-image on every page flush makes `BTreeTest` noticeably slower, around 100 seconds rather than 15.
+That is inherent to write-ahead logging rather than a defect, but it is well above the "up to a minute" the lab text anticipates.
 
 One structural caveat is inherent rather than a defect.
 When an internal page holding an even number of entries splits, the entries cannot divide evenly, because one is pushed up to the parent and `left + right = n - 1` is odd.

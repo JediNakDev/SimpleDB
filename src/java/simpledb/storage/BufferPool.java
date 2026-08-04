@@ -138,6 +138,17 @@ public class BufferPool {
             } catch (IOException e) {
                 throw new RuntimeException("failed to flush pages on commit", e);
             }
+            // The committed contents become the before-image for whichever transaction
+            // modifies the page next.  This has to cover every page the transaction
+            // held, not just the ones still dirty: a mid-transaction flushAllPages()
+            // clears the dirty flag, and skipping those pages would leave a
+            // before-image predating this transaction for a later abort to roll back to.
+            for (PageId pid : lockManager.pagesHeldBy(tid)) {
+                Page p = pages.get(pid);
+                if (p != null) {
+                    p.setBeforeImage();
+                }
+            }
         } else {
             // Discard every page this transaction held a lock on, not just the ones
             // already marked dirty.  Pages are only marked dirty once insertTuple /
@@ -239,7 +250,11 @@ public class BufferPool {
         Page p = pages.get(pid);
         if (p == null)
             return;
-        if (p.isDirty() != null) {
+        TransactionId dirtier = p.isDirty();
+        if (dirtier != null) {
+            // write-ahead logging: the update record must reach disk before the page does
+            Database.getLogFile().logWrite(dirtier, p.getBeforeImage(), p);
+            Database.getLogFile().force();
             Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(p);
             p.markDirty(false, null);
         }

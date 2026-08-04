@@ -31,18 +31,21 @@ public class IntHistogram {
     public IntHistogram(int buckets, int min, int max) {
         this.min = min;
         this.max = max;
-        int range = max - min + 1;
+        // The range can approach 2^32, so it is computed in long arithmetic; doing it
+        // in int overflows to a negative width and bucket count.
+        long range = (long) max - (long) min + 1;
         // A bucket never spans less than one value, so asking for more buckets than
         // there are distinct values just gives one bucket per value.
-        this.width = Math.max(1, (int) Math.ceil(range / (double) buckets));
-        this.counts = new int[(range + width - 1) / width];
+        this.width = (int) Math.max(1L, (long) Math.ceil(range / (double) buckets));
+        this.counts = new int[(int) Math.max(1L, (range + width - 1) / width)];
     }
 
     /**
      * @return the index of the bucket holding v, which must lie within [min, max]
      */
     private int bucketOf(int v) {
-        return (v - min) / width;
+        long index = ((long) v - min) / width;
+        return (int) Math.min(index, counts.length - 1);
     }
 
     /**
@@ -79,7 +82,7 @@ public class IntHistogram {
             return 1.0;
         }
         int b = bucketOf(v);
-        int bucketRight = min + (b + 1) * width - 1;
+        long bucketRight = (long) min + (long) (b + 1) * width - 1;
         // the part of v's own bucket lying above v, plus every bucket beyond it
         double matched = (bucketRight - v) / (double) width * counts[b];
         for (int i = b + 1; i < counts.length; i++) {
@@ -146,8 +149,8 @@ public class IntHistogram {
         StringBuilder sb = new StringBuilder("IntHistogram(min=" + min + ", max=" + max
                 + ", width=" + width + ", ntups=" + ntups + ")");
         for (int i = 0; i < counts.length; i++) {
-            sb.append("\n  [").append(min + i * width).append(", ")
-              .append(Math.min(max, min + (i + 1) * width - 1))
+            sb.append("\n  [").append((long) min + (long) i * width).append(", ")
+              .append(Math.min(max, (long) min + (long) (i + 1) * width - 1))
               .append("] -> ").append(counts[i]);
         }
         return sb.toString();
