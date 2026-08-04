@@ -139,11 +139,15 @@ public class BufferPool {
                 throw new RuntimeException("failed to flush pages on commit", e);
             }
         } else {
-            for (PageId pid : new ArrayList<>(pages.keySet())) {
-                Page p = pages.get(pid);
-                if (p != null && tid.equals(p.isDirty())) {
-                    discardPage(pid);
-                }
+            // Discard every page this transaction held a lock on, not just the ones
+            // already marked dirty.  Pages are only marked dirty once insertTuple /
+            // deleteTuple returns, so a B+ tree operation that aborts part-way through
+            // (a lock wait throwing out of splitLeafPage, say) leaves half-applied
+            // structural edits sitting in the pool still marked clean.  Dropping them
+            // by dirty-flag alone would leave that corruption visible to other
+            // transactions; re-reading a merely-read page from disk is harmless.
+            for (PageId pid : lockManager.pagesHeldBy(tid)) {
+                discardPage(pid);
             }
         }
         lockManager.releaseAll(tid);
@@ -168,9 +172,11 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         DbFile file = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> dirtied = file.insertTuple(tid, t);
-        for (Page p : dirtied) {
-            p.markDirty(true, tid);
-            pages.put(p.getId(), p);
+        synchronized (this) {
+            for (Page p : dirtied) {
+                p.markDirty(true, tid);
+                pages.put(p.getId(), p);
+            }
         }
     }
 
@@ -192,9 +198,11 @@ public class BufferPool {
         DbFile file = Database.getCatalog()
                 .getDatabaseFile(t.getRecordId().getPageId().getTableId());
         List<Page> dirtied = file.deleteTuple(tid, t);
-        for (Page p : dirtied) {
-            p.markDirty(true, tid);
-            pages.put(p.getId(), p);
+        synchronized (this) {
+            for (Page p : dirtied) {
+                p.markDirty(true, tid);
+                pages.put(p.getId(), p);
+            }
         }
     }
 
